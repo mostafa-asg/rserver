@@ -1,14 +1,14 @@
 use core::str;
 use std::{collections::HashMap, fmt::Display};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Method {
     Get,
     Post,
     Uninitialized
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Version {
     V1_1,
     Uninitialized
@@ -19,7 +19,7 @@ pub struct HttpRequest {
     pub version: Version,
     pub method: Method,
     pub resource: String,
-    pub header: HashMap<String, String>,
+    pub header: HashMap<String, String>,    
     pub body: Vec<u8>
 }
 

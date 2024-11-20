@@ -1,23 +1,22 @@
-use std::{collections::HashMap, io::Read, net::{TcpListener, TcpStream}, sync::{Arc, RwLock}, thread};
+use std::{io::Read, net::{TcpListener, TcpStream}, sync::{Arc, RwLock}, thread};
 
 use http::{httprequest::HttpRequest, httpresponse::HttpResponse};
-
-pub type Handler = fn(&HttpRequest) -> HttpResponse;
+use crate::router::{Router, RouteHandler};
 
 pub struct Server<'a> {
-    socket_addr: &'a str,
-    handlers: Arc<RwLock<HashMap<String, Handler>>>
+    socket_addr: &'a str,    
+    router: Arc<RwLock<Router>>,
 }
 
 impl<'a> Server<'a> {
     pub fn new(socket_addr: &'a str) -> Self {
         Server {
-            socket_addr,
-            handlers: Arc::new(RwLock::new(HashMap::new()))
+            socket_addr,            
+            router: Arc::new(RwLock::new(Router::default()))
         }
     }   
 
-    fn handle_connection(stream: &mut TcpStream, handlers: Arc<RwLock<HashMap<String, Handler>>>) {
+    fn handle_connection(stream: &mut TcpStream, router: Arc<RwLock<Router>>) {
         let mut raw_request: Vec<u8> = Vec::new();
         let mut temp_buff = [0u8; 1024];
         loop {
@@ -35,9 +34,8 @@ impl<'a> Server<'a> {
 
         let http_parse_result = HttpRequest::parse(raw_request);
         match http_parse_result {
-            Some(request) => {
-                let registered_paths = handlers.read().unwrap();
-                match registered_paths.get(&request.resource) {
+            Some(request) => {                                
+                match router.read().unwrap().find_handler(request.method, &request.resource) {
                     Some(handler) => {
                         let response = handler(&request);                        
                         response.send_response(stream).unwrap();
@@ -61,8 +59,8 @@ impl<'a> Server<'a> {
         for new_connection in listener.incoming() {
             match new_connection {
                 Ok(mut stream) => {
-                    let handlers = self.handlers.clone();
-                    thread::spawn(move || Server::handle_connection(&mut stream, handlers));
+                    let router = self.router.clone();
+                    thread::spawn(move || Server::handle_connection(&mut stream, router));
                 },
                 Err(e) => {
                     eprintln!("Connection failed: {}", e);
@@ -71,8 +69,14 @@ impl<'a> Server<'a> {
         }
     }
 
-    pub fn register_handler(&self, path: String, handler: Handler) {
-        let mut map = self.handlers.write().unwrap();
-        map.insert(path, handler);
+    pub fn get(&self, path: &str, handler: RouteHandler) {
+        let mut router = self.router.write().unwrap();
+        router.get(path, handler);
     }
+
+    pub fn post(&self, path: &str, handler: RouteHandler) {
+        let mut router = self.router.write().unwrap();
+        router.post(path, handler);
+    }
+
 }

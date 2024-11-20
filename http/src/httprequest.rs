@@ -20,10 +20,15 @@ pub struct HttpRequest {
     pub method: Method,
     pub resource: String,
     pub header: HashMap<String, String>,    
+    pub path_params: HashMap<String, String>,
     pub body: Vec<u8>
 }
 
 impl HttpRequest {
+    pub fn with_path_params(&mut self, path_params: &HashMap<String, String>) {
+        self.path_params = path_params.clone();
+    }
+
     pub fn parse(raw_request: Vec<u8>) -> Option<HttpRequest> {
         let end_of_header = raw_request.windows(4)
                                               .position(|window| window == b"\r\n\r\n")?;
@@ -55,6 +60,7 @@ impl HttpRequest {
             method: method.into(),
             resource: resource.to_owned(),
             header: headers,
+            path_params: HashMap::new(),
             body: body_part.to_vec(),
         })
     }        

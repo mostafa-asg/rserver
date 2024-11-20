@@ -1,7 +1,7 @@
-use std::{io::Read, net::{TcpListener, TcpStream}, sync::{Arc, RwLock}, thread};
+use std::{collections::HashMap, io::Read, net::{TcpListener, TcpStream}, sync::{Arc, RwLock}, thread};
 
 use http::{httprequest::HttpRequest, httpresponse::HttpResponse};
-use crate::router::{Router, RouteHandler};
+use crate::router::{Router, RouteHandler, normalize_path};
 
 pub struct Server<'a> {
     socket_addr: &'a str,    
@@ -32,12 +32,33 @@ impl<'a> Server<'a> {
             }
         }
 
-        let http_parse_result = HttpRequest::parse(raw_request);
+        fn extract_path_params(path: &str, params_pos: &HashMap<usize, String>) -> HashMap<String, String> {
+            let normalized_path = normalize_path(path);
+            let parts: Vec<&str> = normalized_path.split('/').collect();
+            let mut result = HashMap::new();
+
+            let s:usize = 12;
+            for (position, param_name) in params_pos.iter() {
+                let param_value = parts[*position];
+                result.insert(param_name.to_owned(), param_value.to_owned());
+            }
+
+            return result;
+        }
+
+        let mut http_parse_result = HttpRequest::parse(raw_request);
         match http_parse_result {
-            Some(request) => {                                
+            Some(ref mut request) => {                                
                 match router.read().unwrap().find_handler(request.method, &request.resource) {
-                    Some(handler) => {
+                    Some(route_info) => {
+                        let handler = route_info.handler;                        
+                        // extract path parameters
+                        let path_params = extract_path_params(&request.resource, &route_info.params_pos);
+                        request.with_path_params(&path_params);  
+
+                        // execute the handler
                         let response = handler(&request);                        
+
                         response.send_response(stream).unwrap();
                     },
                     None => {

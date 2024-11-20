@@ -10,7 +10,7 @@ pub type RouteHandler = fn(&HttpRequest) -> HttpResponse;
 const CATCH_ALL: &str = "[^/]+"; // catch everything expect slash
 
 /// Normalizes a path by removing leading and trailing slashes.
-fn normalize_path(path: &str) -> &str {        
+pub fn normalize_path(path: &str) -> &str {        
     if path.len() > 2 {
         let mut start: usize = 0;
         let mut end: usize = path.len();
@@ -78,8 +78,8 @@ fn regex_that_match(path: &str) -> String {
 }
 
 pub struct RouteInfo {
-    handler: RouteHandler,
-    params_pos: HashMap<usize, String>, // key: position, value: parameter name
+    pub handler: RouteHandler,
+    pub params_pos: HashMap<usize, String>, // key: position, value: parameter name
 }
 
 pub struct Router {
@@ -118,7 +118,7 @@ impl Router {
         });        
     }
 
-    pub fn find_handler(&self, method: Method, path: &str) -> Option<RouteHandler> {
+    pub fn find_handler(&self, method: Method, path: &str) -> Option<&RouteInfo> {
         let hashmap = match method {
             Method::Get => &self.get_entries,
             Method::Post => &self.post_entries,
@@ -130,7 +130,7 @@ impl Router {
         for (regex_exper, route_info) in hashmap {            
             let regex = Regex::new(regex_exper).unwrap();
             if regex.is_match(path) {                
-                return Some(route_info.handler);
+                return Some(route_info);
             }
         }
 
@@ -216,19 +216,19 @@ mod tests {
 
         let handler = router.find_handler(Method::Get, "/users/123/orders");
         assert_eq!(handler.is_some(), true);
-        assert_eq!(handler.unwrap(), user_all_orders);
+        assert_eq!(handler.unwrap().handler, user_all_orders);
 
         let handler = router.find_handler(Method::Get, "/users/123/orders/A123");
         assert_eq!(handler.is_some(), true);
-        assert_eq!(handler.unwrap(), user_order_details);
+        assert_eq!(handler.unwrap().handler, user_order_details);
 
         let handler = router.find_handler(Method::Get, "/users/user1");
         assert_eq!(handler.is_some(), true);
-        assert_eq!(handler.unwrap(), user_detail);
+        assert_eq!(handler.unwrap().handler, user_detail);
 
         let handler = router.find_handler(Method::Get, "/users");
         assert_eq!(handler.is_some(), true);
-        assert_eq!(handler.unwrap(), all_users);
+        assert_eq!(handler.unwrap().handler, all_users);
 
         let handler = router.find_handler(Method::Get, "/user");
         assert_eq!(handler.is_some(), false);
